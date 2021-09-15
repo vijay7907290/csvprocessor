@@ -18,10 +18,8 @@ class Appmodel extends CI_Model
             return array('status'=>false, 'reason'=>'Please select a CSV file to upload.', 'data'=>array());
         }
     }
-    public function uploadfile()
+    public function uploadfile($table='',$requiredHeaders = array())
     {
-    	$tabel="records";
-		$requiredHeaders = array(array('db_col_name'=>"Module_code","csv_col_name"=>"Module code"),array('db_col_name'=>"Module_name","csv_col_name"=>"Module name"),array('db_col_name'=>"Module_term","csv_col_name"=>"Module term"));
     	$response = $this->checkfile();
     	$errors = array();
     	if($response['status']){
@@ -62,20 +60,26 @@ class Appmodel extends CI_Model
 				    while (($d = fgetcsv($handle, 1000, ",")) !== FALSE) {
 				        $row++;
 						$sqd = array();
+						$emptyrow=true;
 				    	foreach ($requiredHeaders as $hk => $rheading) {
-							if($d[$hk]==''){
-								$errors['missing_'.$hk][] = $row;
-								$response['status'] = false;
+				    		$emptyrow = $emptyrow && ($d[$hk]=='');
+				    	}
+				    	if(!$emptyrow){
+					    	foreach ($requiredHeaders as $hk => $rheading) {
+								if($d[$hk]==''){
+									$errors['missing_'.$hk][] = $row;
+									$response['status'] = false;
+								}
+								if(preg_match('/[\'^£$%&*()}{@#~?><>,|=_+¬-]/', $d[$hk])){
+									$errors['symbols_'.$hk][] = $row;
+									$response['status'] = false;
+								}
+								if($response['status']){
+									$sqd[$rheading['db_col_name']]=$d[$hk];
+								}
 							}
-							if(preg_match('/[\'^£$%&*()}{@#~?><>,|=_+¬-]/', $d[$hk])){
-								$errors['symbols_'.$hk][] = $row;
-								$response['status'] = false;
-							}
-							if($response['status']){
-								$sqd[$rheading['db_col_name']]=$d[$hk];
-							}
-						}
-						if($response['status']){
+				    	}
+						if($response['status'] && !empty($sqd)){
 							$sqlData[]=$sqd;
 						}
 				    }
@@ -86,7 +90,7 @@ class Appmodel extends CI_Model
 				}
 				if($response['status']){
 					if(!empty($sqlData)){
-						$no=$this->db->insert_batch($tabel,$sqlData);
+						$no=$this->db->insert_batch($table,$sqlData);
 						if((int)$no==0){
 							$response['status'] = false;
 		                	$response['reason'] = 'Unable to save records in the file.';
@@ -149,7 +153,7 @@ class Appmodel extends CI_Model
     		if($url[0]='/'){
     			$url=substr($url, 1);
     		}
-    		$message = '';
+    		$message = '<div>File Location : <a href="'.base_url($url).'">'.base_url($url).'<a></div><div><pre>'.json_encode(array_values($errorMessages)).'</pre></div>';
     		$config = array();
 			$config['protocol'] = 'smtp';
 			$config['smtp_host'] = 'www.awsm.in';
@@ -159,8 +163,8 @@ class Appmodel extends CI_Model
 			$this->email->initialize($config);
     		$this->email->from('fileuploaderror@awsm.in', 'Error Notifications');
 			$this->email->to('operations@awsm.in');
-			$this->email->type('html');
-			$this->email->subject('Eror Uploading File');
+			$this->email->set_mailtype('html');
+			$this->email->subject('Error Uploading File');
 			$this->email->message($message);
 			if($this->email->send()){
 				$response['status']=true;
