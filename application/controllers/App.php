@@ -19,7 +19,9 @@ class App extends CI_Controller
 	}
 	public function uploadcsv()
 	{
-		$response = $this->appmodel->uploadfile();
+		$table="records";
+		$requiredHeaders = array(array('db_col_name'=>"Module_code","csv_col_name"=>"Module code"),array('db_col_name'=>"Module_name","csv_col_name"=>"Module name"),array('db_col_name'=>"Module_term","csv_col_name"=>"Module term"));
+		$response = $this->appmodel->uploadfile($table,$requiredHeaders);
 		echo json_encode($response);
 	}
 }
